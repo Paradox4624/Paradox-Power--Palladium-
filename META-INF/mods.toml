@@ -1,0 +1,21 @@
+modLoader="lowcodefml"
+showAsResourcePack = false
+loaderVersion="[47,)"
+license="All Rights Reserved"
+
+[[mods]]
+modId="paradoxpower"
+version="1.0.0"
+logoFile = "logo.png"
+logoBlur = false
+displayName="Paradox Power (Palladium)"
+description='''
+Palladium Powers by Paradox42
+'''
+
+[[dependencies.paradoxpower]]
+modId = "palladium"
+mandatory = true
+versionRange = "[4.5.9,)"
+ordering = "NONE"
+side = "BOTH"

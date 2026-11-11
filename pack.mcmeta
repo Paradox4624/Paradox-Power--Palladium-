@@ -1,0 +1,13 @@
+{
+    "pack": {
+        "id": "paradoxpower",
+        "pack_format": 15,
+        "description": "Palladium Powers by Paradox42",
+        "version": "1.0.0"
+    },
+    "dependencies": {
+        "common": {},
+        "fabric": {},
+        "forge": {}
+    }
+}
