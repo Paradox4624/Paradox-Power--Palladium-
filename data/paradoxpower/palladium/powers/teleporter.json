@@ -6,28 +6,38 @@
     "gui_display_type": "tree",
     "abilities": {
         "teleport": {
-            "type": "palladium:dummy",
+            "type": "paradoxpower:teleport_ray",
             "icon": "minecraft:ender_pearl",
             "title": "Teleport",
             "bar_color": "white",
             "hidden": false,
             "hidden_in_bar": false,
-            "list_index": 0,
+            "list_index": 2,
             "gui_position": [0, 0],
             "gui_frame_type": "task",
-            "description": "Teleport forward to where you are looking.",
+            "description": "Teleport to where you are looking.",
+            "range": 500,
+            "swap": true,
+            "particle_red": 0.5,
+            "particle_green": 0.2,
+            "particle_blue": 0.6,
+            "particle_scale": 0.6,
+            "particle_count": 100,
+            "particle_position": "both",
+            "sound": "minecraft:entity.enderman.teleport",
+            "sound_volume": 1,
+            "sound_pitch": 1,
             "conditions": {
                 "enabling": [
                     {
                         "type": "palladium:action",
-                        "cooldown": 0,
+                        "cooldown": 5,
                         "key_type": "key_bind",
-                        "needs_empty_hand": false,
-                        "allow_scrolling_when_crouching": true
+                        "needs_empty_hand": false
                     }
                 ],
                 "unlocking": []
             }
-        }       
+        }
     }
 }
