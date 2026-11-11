@@ -1,0 +1,33 @@
+{
+    "name": "Teleporter",
+    "persistent_data": true,
+    "background": "minecraft:textures/block/white_wool.png",
+    "icon": "minecraft:ender_pearl",
+    "gui_display_type": "tree",
+    "abilities": {
+        "teleport": {
+            "type": "palladium:dummy",
+            "icon": "minecraft:ender_pearl",
+            "title": "Teleport",
+            "bar_color": "white",
+            "hidden": false,
+            "hidden_in_bar": false,
+            "list_index": 0,
+            "gui_position": [0, 0],
+            "gui_frame_type": "task",
+            "description": "Teleport forward to where you are looking.",
+            "conditions": {
+                "enabling": [
+                    {
+                        "type": "palladium:action",
+                        "cooldown": 0,
+                        "key_type": "key_bind",
+                        "needs_empty_hand": false,
+                        "allow_scrolling_when_crouching": true
+                    }
+                ],
+                "unlocking": []
+            }
+        }       
+    }
+}
