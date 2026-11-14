@@ -12,7 +12,7 @@
             "bar_color": "white",
             "hidden": false,
             "hidden_in_bar": false,
-            "list_index": 2,
+            "list_index": 0,
             "gui_position": [0, 0],
             "gui_frame_type": "task",
             "description": "Teleport to where you are looking.",
@@ -34,6 +34,37 @@
                         "cooldown": 5,
                         "key_type": "key_bind",
                         "needs_empty_hand": false
+                    }
+                ],
+                "unlocking": []
+            }
+        },
+        "Portal":{
+            "type": "paradoxpower:open_portal",
+            "icon": "minecraft:ender_pearl",
+            "title": "Open Portal",
+            "bar_color": "white",
+            "hidden": false,
+            "hidden_in_bar": false,
+            "list_index": 2,
+            "gui_position": [0, 1],
+            "gui_frame_type": "task",
+            "description": "Open a portal to a target location.",
+            "particle_red": 0.5,
+            "particle_green": 0.2,
+            "particle_blue": 0.6,
+            "particle_scale": 0.6,
+            "sound": "minecraft:entity.enderman.teleport",
+            "sound_volume": 1,
+            "sound_pitch": 1,
+            "conditions": {
+                "enabling": [
+                    {
+                        "type": "palladium:toggle",
+                        "cooldown": 0,
+                        "key_type": "key_bind",
+                        "needs_empty_hand": false,
+                        "allow_scrolling_when_crouching": true
                     }
                 ],
                 "unlocking": []

@@ -1,3 +1,47 @@
+if (!global.px) {global.px= {}};
+
+global.px.portalLifeTime = 40;
+
+global.px.createPortalPair = function (entity, posA, posB) {
+    let spawnPortal = (origin, target, yaw, uuid) => {
+        // area_effect_cloud is invisible, has no AI, and doesn't interfere with blocks
+        let portal = entity.level.createEntity('minecraft:area_effect_cloud')
+        portal.setPosition(origin.x, origin.y, origin.z)
+        portal.yaw = yaw;
+
+        // Keep the cloud alive permanently and tag it for our tick loops
+        portal.mergeNbt({
+            Duration:2000000000,
+            Radius: 0.0,
+            RadiusPerTick: 0.0,
+            RadiusOnUse:0.0,
+            WaitTime: 0,
+            Invulnerable: 1,
+            Invisible: 1,
+            Tags: ['paradoxpower_portal', 'paradoxpower_portal_' + uuid]
+        });
+
+        // Store destination coordinates in persistentData
+        portal.persistentData.putDouble('paradoxpower_destX', target.x)
+        portal.persistentData.putDouble('paradoxpower_destY', target.y)
+        portal.persistentData.putDouble('paradoxpower_destZ', target.z)
+
+        portal.persistentData.putLong('paradoxpower_portal_duration', entity.level.time + global.px.portalLifeTime)
+
+        portal.spawn()
+        return portal
+    }
+
+    spawnPortal(posA, posB, entity.yaw, entity.uuid)
+    spawnPortal(posB, posA, entity.yaw + 180, entity.uuid)
+};
+
+global.px.openPortals = function(){
+
+};
+
+
+
 StartupEvents.registry('palladium:abilities', (event) => {
     event.create('paradoxpower:teleport_ray')
         .icon(palladium.createItemIcon('minecraft:ender_pearl'))
@@ -15,8 +59,7 @@ StartupEvents.registry('palladium:abilities', (event) => {
         .addProperty('sound_volume', 'float', 1.0, 'Sound volume')
         .addProperty('sound_pitch', 'float', 1.0, 'Sound pitch')
 
-        .tick((entity, entry, holder, enabled) => {
-            if (!enabled) return; // Ability is not enabled, return early.
+        .firstTick((entity, entry, holder, enabled) => {
 
             const yOffset = 1.0;
             const blockCenteringOffset = 0.5;
@@ -137,4 +180,62 @@ StartupEvents.registry('palladium:abilities', (event) => {
                 );
             });
         });
+});
+
+StartupEvents.registry('palladium:abilities', (event) => {
+    event.create('paradoxpower:open_portal')
+        .icon(palladium.createItemIcon('minecraft:ender_pearl'))
+        .documentationDescription('Open a Portal to a target location, allowing for teleportation between the two locations.')
+
+        .addProperty('particle_red', 'float', 0.3, 'Red component of particle color')
+        .addProperty('particle_green', 'float', 0.3, 'Green component of particle color')
+        .addProperty('particle_blue', 'float', 0.3, 'Blue component of particle color')
+        .addProperty('particle_scale', 'float', 0.5, 'Particle scale')
+        .addProperty('particle_count', 'integer', 50, 'Particle amount')
+        .addProperty('sound', 'string', 'minecraft:entity.enderman.teleport', 'Sound effect')
+        .addProperty('sound_volume', 'float', 1.0, 'Sound volume')
+        .addProperty('sound_pitch', 'float', 1.0, 'Sound pitch')
+
+        .firstTick((entity, entry, holder, enabled) => {
+            if (!enabled) return; // Ability is not enabled, return early.
+            entity.tell(entity.name + ' activated the Open Portal ability!');
+
+            //check if destination set else return early with message
+
+            //remove any prevous portals for player
+
+            //create new portals taggin them to player and setting their duration for 1-2 seconds in the future
+            let portals = entity.level.getEntities().filter(e => e.tags.contains('paradoxpower_portal_' + entity.uuid));
+
+            portals.forEach(portal => {
+                entity.tell('--- portal death ---');
+                portal.kill();
+            });
+
+            let destX = entity.persistentData.getDouble('paradoxpower_destX')
+            let destY = entity.persistentData.getDouble('paradoxpower_destY')
+            let destZ = entity.persistentData.getDouble('paradoxpower_destZ')
+
+            let posA = { x: entity.x + 2, y: entity.y, z: entity.z }
+            let posB = { x: destX, y: destY, z: destZ }
+            
+            global.px.createPortalPair(entity, posA, posB)
+            entity.tell('Summoned linked portal pair!')
+
+        })
+
+        .tick((entity, entry, holder, enabled) => {
+            if (!enabled) return; // Ability is not enabled, return early.
+            if (entity.level.time % 40 === 0) {
+                entity.tell(entity.name + ' is keeping the Portals open.');
+            }
+
+            //deducte energy from player for keeping the portals open
+            
+            let portals = entity.level.getEntities().filter(e => e.tags.contains('paradoxpower_portal_' + entity.uuid));
+
+            portals.forEach(portal => {
+                portal.persistentData.putLong('paradoxpower_portal_duration', entity.level.time + global.px.portalLifeTime)
+            });
+        })
 });
