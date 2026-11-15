@@ -1,3 +1,4 @@
+
 if (!global.px) {global.px= {}};
 
 global.px.portalLifeTime = 40;
@@ -60,7 +61,7 @@ StartupEvents.registry('palladium:abilities', (event) => {
         .addProperty('sound_pitch', 'float', 1.0, 'Sound pitch')
 
         .firstTick((entity, entry, holder, enabled) => {
-
+            if (!enabled) return; // Ability is not enabled, return early.
             const yOffset = 1.0;
             const blockCenteringOffset = 0.5;
             let range = entry.getPropertyByName('range');

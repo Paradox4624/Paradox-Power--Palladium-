@@ -1,3 +1,100 @@
+// Load Java's SharedSuggestionProvider helper to easily turn JS arrays into Brigadier suggestions
+const $SharedSuggestionProvider = Java.loadClass('net.minecraft.commands.SharedSuggestionProvider')
+
+/*
+ServerEvents.commandRegistry(event => {
+    const { commands: Commands, arguments: Arguments } = event
+
+    event.register(
+        Commands.literal('warp')
+            .then(
+                Commands.argument('destination', Arguments.STRING.create(event))
+                    // Attach custom tab-completion suggestions to the argument
+                    .suggests((context, builder) => {
+                        const player = context.source.player
+                        
+                        // Safety check in case a command block or server console runs it
+                        if (!player) return builder.buildFuture()
+
+                        // Read the player's persistentData (defaults to empty array if not set)
+                        const warps = player.persistentData.unlockedWarps || []
+                        
+                        // Convert the NBT/JS list into a clean JS string array for Brigadier
+                        const suggestions = []
+                        for (let i = 0; i < warps.length; i++) {
+                            // If stored as an NBT ListTag, .getString(i) or String() extracts the text
+                            suggestions.push(String(warps[i]).replace(/^"|"$/g, ''))
+                        }
+
+                        // Automatically filters suggestions based on what the player has typed so far
+                        return $SharedSuggestionProvider.suggest(suggestions, builder)
+                    })
+                    .executes(ctx => {
+                        const player = ctx.source.player
+                        const dest = Arguments.STRING.getResult(ctx, 'destination')
+                        
+                        player.tell(`Teleporting to: ${dest}`)
+                        return 1
+                    })
+            )
+    )
+})
+
+
+
+
+                            .suggests((context, builder) => {
+                                const player = context.source.player
+                                
+                                // Safety check in case a command block or server console runs it
+                                if (!player) return builder.buildFuture()
+
+                                // Read the player's persistentData (defaults to empty array if not set)
+                                let visited = player.persistentData.paradoxpower_visiteddims;
+                            
+                                // Automatically filters suggestions based on what the player has typed so far
+                                return $SharedSuggestionProvider.suggest(visited, builder)
+                            })
+
+*/
+
+
+
+PlayerEvents.tick(event => {
+    console.log("start player dim check tick script");
+    if (event.player.age % 40 === 0) {
+        let visited = event.player.persistentData.paradoxpower_visiteddims || [];
+        let dim = event.player.level.dimension.toString();
+        let found = visited.find(tag => {
+            if (tag) {
+                return tag.getAsString() === dim;
+            } else {
+                return false;
+            }
+        });
+        if (found) { return; }
+        visited.push(dim);
+        event.player.persistentData.paradoxpower_visiteddims = visited;
+        event.player.tell("adding worlds:");
+        event.player.tell(visited.toString());
+    }
+});
+
+
+
+ServerEvents.commandRegistry(event => {
+    const { commands: Commands, arguments: Arguments } = event
+    event.register(
+        Commands.literal('px_fix').executes(ctx => {
+            let player = ctx.source.player
+            if (!player) return 0
+
+            player.persistentData.paradoxpower_visiteddims = ["jj"];
+            return 1
+        })
+    )
+})
+
 ServerEvents.commandRegistry(event => {
     const { commands: Commands, arguments: Arguments } = event
     event.register(
@@ -12,22 +109,47 @@ ServerEvents.commandRegistry(event => {
                             const x = Arguments.WORD.getResult(ctx, "x")
                             const y = Arguments.WORD.getResult(ctx, "y")
                             const z = Arguments.WORD.getResult(ctx, "z")
+                            const dim = player.level.dimension.toString();
 
                             player.persistentData.putDouble('paradoxpower_destX', x);
                             player.persistentData.putDouble('paradoxpower_destY', y);
                             player.persistentData.putDouble('paradoxpower_destZ', z);
+                            player.persistentData.putDouble('paradoxpower_destDim', dim);
                             player.tell('Setting destination');
                             return 1
                         })
+                        .then(Commands.argument('dimension', Arguments.WORD.create(event))
+
+                            .executes(ctx => {
+                                let player = ctx.source.player
+                                if (!player) return 0
+
+                                const x = Arguments.WORD.getResult(ctx, "x")
+                                const y = Arguments.WORD.getResult(ctx, "y")
+                                const z = Arguments.WORD.getResult(ctx, "z")
+                                const dim = Arguments.WORD.getResult(ctx, "dimension")
+
+                                player.persistentData.putDouble('paradoxpower_destX', x);
+                                player.persistentData.putDouble('paradoxpower_destY', y);
+                                player.persistentData.putDouble('paradoxpower_destZ', z);
+                                player.persistentData.putDouble('paradoxpower_destDim', dim);
+                                player.tell('Setting destination');
+                                return 1
+                            })
+                        )
                     )
                 )
             )
     )
 })
 
+
+
 LevelEvents.tick(event => {
     const { level } = event
     if (level.clientSide || level.time % 4 !== 0) return
+
+    console.log("start portal tick script");
 
     // Find all portal entities in the loaded level
     let portals = level.getEntities().filter(e => e.tags.contains('paradoxpower_portal'))
@@ -96,7 +218,7 @@ LevelEvents.tick(event => {
             portal.x,
             particleCenterY,
             portal.z,
-            0.1,0.1,0.1,100,0.04
+            0.1, 0.1, 0.1, 100, 0.04
         );
 
         // Define a 1.5x2x1.5 collision box around the portal entity
