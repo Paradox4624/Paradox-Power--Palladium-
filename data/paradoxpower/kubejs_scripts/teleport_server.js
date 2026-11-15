@@ -43,18 +43,7 @@ ServerEvents.commandRegistry(event => {
 
 
 
-                            .suggests((context, builder) => {
-                                const player = context.source.player
-                                
-                                // Safety check in case a command block or server console runs it
-                                if (!player) return builder.buildFuture()
 
-                                // Read the player's persistentData (defaults to empty array if not set)
-                                let visited = player.persistentData.paradoxpower_visiteddims;
-                            
-                                // Automatically filters suggestions based on what the player has typed so far
-                                return $SharedSuggestionProvider.suggest(visited, builder)
-                            })
 
 */
 
@@ -119,7 +108,18 @@ ServerEvents.commandRegistry(event => {
                             return 1
                         })
                         .then(Commands.argument('dimension', Arguments.WORD.create(event))
+                            .suggests((context, builder) => {
+                                const player = context.source.player
+                                
+                                // Safety check in case a command block or server console runs it
+                                if (!player) return builder.buildFuture()
 
+                                // Read the player's persistentData (defaults to empty array if not set)
+                                let visited = player.persistentData.paradoxpower_visiteddims;
+                            
+                                // Automatically filters suggestions based on what the player has typed so far
+                                return $SharedSuggestionProvider.suggest(visited, builder)
+                            })
                             .executes(ctx => {
                                 let player = ctx.source.player
                                 if (!player) return 0
