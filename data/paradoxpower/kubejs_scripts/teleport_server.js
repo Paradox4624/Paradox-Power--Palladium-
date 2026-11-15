@@ -1,57 +1,7 @@
-// Load Java's SharedSuggestionProvider helper to easily turn JS arrays into Brigadier suggestions
-const $SharedSuggestionProvider = Java.loadClass('net.minecraft.commands.SharedSuggestionProvider')
 
-/*
-ServerEvents.commandRegistry(event => {
-    const { commands: Commands, arguments: Arguments } = event
-
-    event.register(
-        Commands.literal('warp')
-            .then(
-                Commands.argument('destination', Arguments.STRING.create(event))
-                    // Attach custom tab-completion suggestions to the argument
-                    .suggests((context, builder) => {
-                        const player = context.source.player
-                        
-                        // Safety check in case a command block or server console runs it
-                        if (!player) return builder.buildFuture()
-
-                        // Read the player's persistentData (defaults to empty array if not set)
-                        const warps = player.persistentData.unlockedWarps || []
-                        
-                        // Convert the NBT/JS list into a clean JS string array for Brigadier
-                        const suggestions = []
-                        for (let i = 0; i < warps.length; i++) {
-                            // If stored as an NBT ListTag, .getString(i) or String() extracts the text
-                            suggestions.push(String(warps[i]).replace(/^"|"$/g, ''))
-                        }
-
-                        // Automatically filters suggestions based on what the player has typed so far
-                        return $SharedSuggestionProvider.suggest(suggestions, builder)
-                    })
-                    .executes(ctx => {
-                        const player = ctx.source.player
-                        const dest = Arguments.STRING.getResult(ctx, 'destination')
-                        
-                        player.tell(`Teleporting to: ${dest}`)
-                        return 1
-                    })
-            )
-    )
-})
-
-
-
-
-
-
-*/
-
-
-
+//every 2 seconds, check the players current dimension and if not already listed, add the dimension to the list of visited dimensions.
 PlayerEvents.tick(event => {
-    console.log("start player dim check tick script");
-    if (event.player.age % 40 === 0) {
+    if (event.level.time % 40 === 0) {
         let visited = event.player.persistentData.paradoxpower_visiteddims || [];
         let dim = event.player.level.dimension.toString();
         let found = visited.find(tag => {
@@ -64,13 +14,10 @@ PlayerEvents.tick(event => {
         if (found) { return; }
         visited.push(dim);
         event.player.persistentData.paradoxpower_visiteddims = visited;
-        event.player.tell("adding worlds:");
-        event.player.tell(visited.toString());
     }
 });
 
-
-
+//temporary command to allow running code for debugging etc
 ServerEvents.commandRegistry(event => {
     const { commands: Commands, arguments: Arguments } = event
     event.register(
@@ -78,16 +25,31 @@ ServerEvents.commandRegistry(event => {
             let player = ctx.source.player
             if (!player) return 0
 
-            player.persistentData.paradoxpower_visiteddims = ["jj"];
+            player.persistentData.paradoxpower_visiteddims = []; //debug used while creating dimensions visited list
+            player.tell('Visited dimensions reset');
+
             return 1
         })
     )
 })
 
+//command to set target destination for portal power. does nothing without the portal power.
 ServerEvents.commandRegistry(event => {
     const { commands: Commands, arguments: Arguments } = event
     event.register(
         Commands.literal('px_portal')
+            .executes(ctx => {
+                let player = ctx.source.player
+                if (!player) return 0
+
+                let destX = player.persistentData.getDouble('paradoxpower_destX')
+                let destY = player.persistentData.getDouble('paradoxpower_destY')
+                let destZ = player.persistentData.getDouble('paradoxpower_destZ')
+                let destDim = player.persistentData.getString('paradoxpower_destDim')
+                player.tell('Current portal destination: ' + destX + " " + destY + " " + destZ + " " + destDim)
+
+                return 1
+            })
             .then(Commands.argument('x', Arguments.WORD.create(event))
                 .then(Commands.argument('y', Arguments.WORD.create(event))
                     .then(Commands.argument('z', Arguments.WORD.create(event))
@@ -95,45 +57,52 @@ ServerEvents.commandRegistry(event => {
                             let player = ctx.source.player
                             if (!player) return 0
 
-                            const x = Arguments.WORD.getResult(ctx, "x")
-                            const y = Arguments.WORD.getResult(ctx, "y")
-                            const z = Arguments.WORD.getResult(ctx, "z")
-                            const dim = player.level.dimension.toString();
+                            const destX = Arguments.WORD.getResult(ctx, "x")
+                            const destY = Arguments.WORD.getResult(ctx, "y")
+                            const destZ = Arguments.WORD.getResult(ctx, "z")
+                            const destDim = player.level.dimension.toString();
 
-                            player.persistentData.putDouble('paradoxpower_destX', x);
-                            player.persistentData.putDouble('paradoxpower_destY', y);
-                            player.persistentData.putDouble('paradoxpower_destZ', z);
-                            player.persistentData.putDouble('paradoxpower_destDim', dim);
-                            player.tell('Setting destination');
+                            player.persistentData.putDouble('paradoxpower_destX', destX);
+                            player.persistentData.putDouble('paradoxpower_destY', destY);
+                            player.persistentData.putDouble('paradoxpower_destZ', destZ);
+                            player.persistentData.putString('paradoxpower_destDim', destDim);
+                            player.tell('New portal destination set: ' + destX + " " + destY + " " + destZ + " " + destDim)
+
                             return 1
                         })
-                        .then(Commands.argument('dimension', Arguments.WORD.create(event))
+                        .then(Commands.argument('dimension', Arguments.STRING.create(event))
                             .suggests((context, builder) => {
                                 const player = context.source.player
-                                
-                                // Safety check in case a command block or server console runs it
                                 if (!player) return builder.buildFuture()
 
                                 // Read the player's persistentData (defaults to empty array if not set)
-                                let visited = player.persistentData.paradoxpower_visiteddims;
-                            
-                                // Automatically filters suggestions based on what the player has typed so far
-                                return $SharedSuggestionProvider.suggest(visited, builder)
+                                let visited = player.persistentData.paradoxpower_visiteddims || [];
+
+                                // Iterate through the list and suggest items that match the user's current input
+                                const remaining = builder.getRemaining().toLowerCase();
+                                visited.forEach(item => {
+                                    if (item.getAsString().toLowerCase().startsWith(remaining)) {
+                                        builder.suggest(item.toString());
+                                    }
+                                });
+
+                                return builder.buildFuture();
                             })
                             .executes(ctx => {
                                 let player = ctx.source.player
                                 if (!player) return 0
 
-                                const x = Arguments.WORD.getResult(ctx, "x")
-                                const y = Arguments.WORD.getResult(ctx, "y")
-                                const z = Arguments.WORD.getResult(ctx, "z")
-                                const dim = Arguments.WORD.getResult(ctx, "dimension")
+                                const destX = Arguments.WORD.getResult(ctx, "x")
+                                const destY = Arguments.WORD.getResult(ctx, "y")
+                                const destZ = Arguments.WORD.getResult(ctx, "z")
+                                const destDim = Arguments.STRING.getResult(ctx, "dimension")
 
-                                player.persistentData.putDouble('paradoxpower_destX', x);
-                                player.persistentData.putDouble('paradoxpower_destY', y);
-                                player.persistentData.putDouble('paradoxpower_destZ', z);
-                                player.persistentData.putDouble('paradoxpower_destDim', dim);
-                                player.tell('Setting destination');
+                                player.persistentData.putDouble('paradoxpower_destX', destX);
+                                player.persistentData.putDouble('paradoxpower_destY', destY);
+                                player.persistentData.putDouble('paradoxpower_destZ', destZ);
+                                player.persistentData.putString('paradoxpower_destDim', destDim);
+                                player.tell('New portal destination set: ' + destX + " " + destY + " " + destZ + " " + destDim)
+
                                 return 1
                             })
                         )
@@ -144,27 +113,26 @@ ServerEvents.commandRegistry(event => {
 })
 
 
-
+//level tick script to update portals and do any teleporting. only run on every 3rd tick.
 LevelEvents.tick(event => {
     const { level } = event
-    if (level.clientSide || level.time % 4 !== 0) return
-
-    console.log("start portal tick script");
+    if (level.clientSide || level.time % 3 !== 0) return
 
     // Find all portal entities in the loaded level
     let portals = level.getEntities().filter(e => e.tags.contains('paradoxpower_portal'))
 
-    const teleportCooldown = 40; // 2 seconds in ticks
+    const teleportCooldown = 40; // 2 seconds cooldown between teleports
+    const particleStepMod = 3; //delay particle spawning to create nicer staggered spawning
+
     portals.forEach(portal => {
         let duration = portal.persistentData.getLong('paradoxpower_portal_duration')
         if (level.time > duration) {
-            portal.tell('--- portal death ---');
-            portal.kill();
+            global.px.killPortal(portal);
             return;
         }
 
-
         let radYaw = portal.yaw * (3.141592653589793 / 180);
+        let particleDelayStep = portal.persistentData.getLong('paradoxpower_portal_delay_step') || 0;
 
         //particles
         let particleSpeed = 0.2; // Adjust speed multiplier
@@ -182,64 +150,82 @@ LevelEvents.tick(event => {
 
         let particleType = 'paradoxpower:portal';  //'minecraft:glow_squid_ink';
 
-        const rndStrength = 0.3;
-
-        function randomFloatRange(x) {
-            return (Math.random() * 2 - 1) * x;
+        function particleStep() { //addvance the particle step and check if particle is next to spawn
+            particleDelayStep += 1;
+            if (particleDelayStep % particleStepMod == 0) return true;
+            return false;
         }
 
+        //spawns portal frame particles, both trails and border
+        function spawnParticle1(x, y, z) {
+            if (particleStep()) {
+                //trail particles
+                level.spawnParticles('minecraft:soul_fire_flame', true,
+                    x,
+                    y,
+                    z,
+                    particleFwdX, 0, particleFwdZ, 0, particleSpeed
+                );
+                //frame particles
+                level.spawnParticles('minecraft:scrape', true,
+                    x,
+                    y,
+                    z,
+                    0.1, 0.1, 0.1, 5, 0
+                );
+            };
+        }
+
+        //interate over length of boarder and draw 4 lines of particles.
         for (let q = -halfSize; q <= halfSize; q += step) {
-            level.spawnParticles(particleType, true,
-                particleCenterX + (particleRightX * q) + randomFloatRange(rndStrength),
-                particleCenterY + halfSize + randomFloatRange(rndStrength),
-                particleCenterZ + (particleRightZ * q) + randomFloatRange(rndStrength),
-                particleFwdX, 0, particleFwdZ, 0, particleSpeed);
-            level.spawnParticles(particleType, true,
-                particleCenterX + (particleRightX * q) + randomFloatRange(rndStrength),
-                particleCenterY - halfSize + randomFloatRange(rndStrength),
-                particleCenterZ + (particleRightZ * q) + randomFloatRange(rndStrength),
-                particleFwdX, 0, particleFwdZ, 0, particleSpeed
+            spawnParticle1(
+                particleCenterX + (particleRightX * q),
+                particleCenterY + halfSize,
+                particleCenterZ + (particleRightZ * q)
             );
-            level.spawnParticles(particleType, true,
-                particleCenterX + (particleRightX * halfSize) + randomFloatRange(rndStrength),
-                particleCenterY + q + randomFloatRange(rndStrength),
-                particleCenterZ + (particleRightZ * halfSize) + randomFloatRange(rndStrength),
-                particleFwdX, 0, particleFwdZ, 0, particleSpeed
+            spawnParticle1(
+                particleCenterX + (particleRightX * (-q)),
+                particleCenterY - halfSize,
+                particleCenterZ + (particleRightZ * (-q))
             );
-            level.spawnParticles(particleType, true,
-                particleCenterX - (particleRightX * halfSize) + randomFloatRange(rndStrength),
-                particleCenterY + q + randomFloatRange(rndStrength),
-                particleCenterZ - (particleRightZ * halfSize) + randomFloatRange(rndStrength),
-                particleFwdX, 0, particleFwdZ, 0, particleSpeed
+            spawnParticle1(
+                particleCenterX + (particleRightX * halfSize),
+                particleCenterY - q,
+                particleCenterZ + (particleRightZ * halfSize),
+            );
+            spawnParticle1(
+                particleCenterX - (particleRightX * halfSize),
+                particleCenterY + q,
+                particleCenterZ - (particleRightZ * halfSize)
             );
         }
 
-        level.spawnParticles('minecraft:end_rod', true,
-            portal.x,
-            particleCenterY,
-            portal.z,
-            0.1, 0.1, 0.1, 100, 0.04
-        );
+        //store the particle stagering variable to continue on next pass
+        portal.persistentData.putLong('paradoxpower_portal_delay_step', particleDelayStep);
 
-        // Define a 1.5x2x1.5 collision box around the portal entity
+        // Define a 2.8 x 2.8 x 2.8 collision box around the portal entity. bringing it in s little from the full 3 x 3 x 3 of the portal frame/trails
         let box = AABB.of(
-            portal.x - 0.75, portal.y, portal.z - 0.75,
-            portal.x + 0.75, portal.y + 2.0, portal.z + 0.75
+            portal.x - 1.4, portal.y + 0.1, portal.z - 1.4,
+            portal.x + 1.4, portal.y + 2.9, portal.z + 1.4
         );
 
         let destX = portal.persistentData.getDouble('paradoxpower_destX')
         let destY = portal.persistentData.getDouble('paradoxpower_destY')
         let destZ = portal.persistentData.getDouble('paradoxpower_destZ')
+        let destDim = portal.server.getLevel(portal.persistentData.getString('paradoxpower_destDim'))
 
-        let motionSpeed = 1.0; // Adjust speed multiplier
+        if (!destDim) return;
+
+        // variables for the push/pull when entering/leaving the portals
+        let motionSpeed = 1.0;
         let motionX = -Math.sin(radYaw) * motionSpeed;
         let motionZ = Math.cos(radYaw) * motionSpeed;
 
         // Check all entities colliding with the box
         level.getEntitiesWithin(box).forEach(target => {
 
-            // Ignore the portals themselves
-            if (target.tags.contains('paradoxpower_portal')) return
+            // Ignore the portals themselves and only target dropped items, living mobs and players
+            if (target.tags.contains('paradoxpower_portal') || (!target.type == 'minecraft:item' && !target.isLiving() && !target.type == 'minecraft:player')) return
 
             // Check cooldown so entities don't loop infinitely (40 ticks = 2 seconds)
             let lastTp = target.persistentData.getLong('paradoxpower_portal_cd')
@@ -248,18 +234,35 @@ LevelEvents.tick(event => {
             // Update cooldown and teleport
             target.persistentData.putLong('paradoxpower_portal_cd', level.time)
 
-
-            target.setMotion(motionX, 0, motionZ);
+            target.setMotion(motionX, 0, motionZ); //pull into portal
             target.hurtMarked = true; // Ensures velocity updates properly on the client/server for some entities
 
+            if (target.type == 'minecraft:player') target.potionEffects.add('minecraft:blindness', 20, 0, false, false) // blindness adds a little something to being ported.
+
+            //schedule the teleport to allow the pull to playout
+            //also spawn teleport particles inside the portals as the entity teleports
             target.server.scheduleInTicks(5, () => {
-                portal.tell('teleporting: ' + target.name);
-                target.teleportTo(destX, destY, destZ)
-                level.playSound(null, destX, destY, destZ, 'minecraft:entity.enderman.teleport', 'neutral', 1.0, 1.0)
+                target.teleportTo(destDim, destX, destY, destZ, [], target.yaw, target.pitch)
+                level.spawnParticles('minecraft:dust 0.6 0.3 0.9 0.5', true,
+                    portal.x,
+                    portal.y + 1.5,
+                    portal.z,
+                    0.5, 0.5, 0.5, 100, 1
+                );
+                level.spawnParticles('minecraft:dust 0.6 0.3 0.9 0.5', true,
+                    destX,
+                    destY + 1.5,
+                    destZ,
+                    0.5, 0.5, 0.5, 100, 1
+                );
             });
 
+            //schedule the push to happen the tick after the teleport completes
+            //also play sound here, so that sounds dont clip off for players when teleporting
             target.server.scheduleInTicks(6, () => {
-                target.setMotion(motionX, 0, motionZ);
+                level.playSound(null, portal.x, portal.y, portal.z, 'minecraft:entity.enderman.teleport', 'neutral', 1.0, 1.0)
+                level.playSound(null, destX, destY, destZ, 'minecraft:entity.enderman.teleport', 'neutral', 1.0, 1.0)
+                target.setMotion(motionX, 0, motionZ); //push out of portal
                 target.hurtMarked = true; // Ensures velocity updates properly on the client/server for some entities
             });
 

@@ -1,21 +1,43 @@
+const ForgeChunkManager = Java.loadClass('net.minecraftforge.common.world.ForgeChunkManager')
 
-if (!global.px) {global.px= {}};
+if (!global.px) { global.px = {} };
 
-global.px.portalLifeTime = 40;
+global.px.portalLifeTime = 40; //how long portals will stay open after the player has stopped powering them, in ticks
 
+
+//register chunks to be force loaded by entity
+global.px.setEntityChunkForced = function (entityOwner, forceChunkLoad) {
+    let level = entityOwner.level
+    let chunkPos = entityOwner.chunkPosition()
+
+    // Parameters: (ServerLevel, modId, ownerUUID, chunkX, chunkZ, chunckLoad, ticking)
+    let result = ForgeChunkManager['forceChunk(net.minecraft.server.level.ServerLevel,java.lang.String,java.util.UUID,int,int,boolean,boolean)'](
+        level,
+        'kubejs', //using kubejs as it is a registered mod and required by this mod
+        entityOwner.uuid,
+        chunkPos.x,
+        chunkPos.z,
+        forceChunkLoad,
+        true // true = full entity ticking; false = redstone/block ticking only
+    )
+};
+
+
+//create linked portals and mark them as belonging to the player
 global.px.createPortalPair = function (entity, posA, posB) {
-    let spawnPortal = (origin, target, yaw, uuid) => {
-        // area_effect_cloud is invisible, has no AI, and doesn't interfere with blocks
-        let portal = entity.level.createEntity('minecraft:area_effect_cloud')
-        portal.setPosition(origin.x, origin.y, origin.z)
+
+    function spawnPortal(origin, target, yaw, uuid) {
+        // area_effect_cloud is invisible, has no AI, and doesn't interfere with blocks        
+        let portal = entity.server.getLevel(origin.dim).createEntity('minecraft:area_effect_cloud')
+        portal.setPosition(origin.x + 0.5, origin.y, origin.z + 0.5);
         portal.yaw = yaw;
 
-        // Keep the cloud alive permanently and tag it for our tick loops
+        // Keep the cloud alive "permanently" and tag it for our tick loops
         portal.mergeNbt({
-            Duration:2000000000,
+            Duration: 2000000000,
             Radius: 0.0,
             RadiusPerTick: 0.0,
-            RadiusOnUse:0.0,
+            RadiusOnUse: 0.0,
             WaitTime: 0,
             Invulnerable: 1,
             Invisible: 1,
@@ -26,21 +48,41 @@ global.px.createPortalPair = function (entity, posA, posB) {
         portal.persistentData.putDouble('paradoxpower_destX', target.x)
         portal.persistentData.putDouble('paradoxpower_destY', target.y)
         portal.persistentData.putDouble('paradoxpower_destZ', target.z)
+        portal.persistentData.putString('paradoxpower_destDim', target.dim);
 
+        //store portal duration. if portal isnt refreashed by player, they will timeout and be killed.
         portal.persistentData.putLong('paradoxpower_portal_duration', entity.level.time + global.px.portalLifeTime)
 
-        portal.spawn()
-        return portal
+        portal.spawn();
+        global.px.setEntityChunkForced(portal, true);
+        return portal;
     }
 
     spawnPortal(posA, posB, entity.yaw, entity.uuid)
     spawnPortal(posB, posA, entity.yaw + 180, entity.uuid)
 };
 
-global.px.openPortals = function(){
 
-};
+//get all portals belonging to uuid
+global.px.getPortals = function (server, uuid) {
+    let matches = [];
 
+    // Iterate over every loaded dimensions (Overworld, Nether, End, modded dims)
+    for (let level of server.allLevels) {
+        for (let entity of level.getAllEntities()) {
+            if (entity.tags.contains('paradoxpower_portal_' + uuid)) {
+                matches.push(entity);
+            }
+        }
+    }
+    return matches;
+}
+
+
+global.px.killPortal = function (portal) {
+    global.px.setEntityChunkForced(portal, false);
+    portal.kill();
+}
 
 
 StartupEvents.registry('palladium:abilities', (event) => {
@@ -96,6 +138,7 @@ StartupEvents.registry('palladium:abilities', (event) => {
                 let highOffset = 10; // vertical search distance above. allows a little more leeway for teleporting to the top of walls, cliffs etc, or through floors from below.
 
                 // Determine the maximum height for search based on if the dimension has a ceiling or not, in the event that the target location is near the world height limit.
+                //todo double check this, its not working in the nether
                 let maxHeight;
                 let dimension = level.dimensionType();
                 if (dimension.hasCeiling() === true) {
@@ -183,6 +226,8 @@ StartupEvents.registry('palladium:abilities', (event) => {
         });
 });
 
+
+//todo: clean up addProperty's maybe creating new ones or just removing all of them. using minecraft built in particles limits the options that would work, so just hard coded atm
 StartupEvents.registry('palladium:abilities', (event) => {
     event.create('paradoxpower:open_portal')
         .icon(palladium.createItemIcon('minecraft:ender_pearl'))
@@ -199,41 +244,35 @@ StartupEvents.registry('palladium:abilities', (event) => {
 
         .firstTick((entity, entry, holder, enabled) => {
             if (!enabled) return; // Ability is not enabled, return early.
-            entity.tell(entity.name + ' activated the Open Portal ability!');
 
-            //check if destination set else return early with message
-
-            //remove any prevous portals for player
-
-            //create new portals taggin them to player and setting their duration for 1-2 seconds in the future
-            let portals = entity.level.getEntities().filter(e => e.tags.contains('paradoxpower_portal_' + entity.uuid));
+            let portals = global.px.getPortals(entity.server, entity.uuid);
 
             portals.forEach(portal => {
-                entity.tell('--- portal death ---');
-                portal.kill();
+                global.px.killPortal(portal);
             });
 
             let destX = entity.persistentData.getDouble('paradoxpower_destX')
             let destY = entity.persistentData.getDouble('paradoxpower_destY')
             let destZ = entity.persistentData.getDouble('paradoxpower_destZ')
+            let destDim = entity.persistentData.getString('paradoxpower_destDim');
 
-            let posA = { x: entity.x + 2, y: entity.y, z: entity.z }
-            let posB = { x: destX, y: destY, z: destZ }
-            
+            const eyePos = entity.getEyePosition()
+            const lookVec = entity.getLookAngle()
+            const targetVec = eyePos.add(lookVec.scale(4.0))
+            const blockPos = BlockPos.containing(targetVec)
+
+            let posA = { x: blockPos.x, y: blockPos.y - 1, z: blockPos.z, dim: entity.level.dimension.toString() }
+            let posB = { x: destX, y: destY, z: destZ, dim: destDim }
+
             global.px.createPortalPair(entity, posA, posB)
-            entity.tell('Summoned linked portal pair!')
-
         })
 
         .tick((entity, entry, holder, enabled) => {
             if (!enabled) return; // Ability is not enabled, return early.
-            if (entity.level.time % 40 === 0) {
-                entity.tell(entity.name + ' is keeping the Portals open.');
-            }
 
-            //deducte energy from player for keeping the portals open
-            
-            let portals = entity.level.getEntities().filter(e => e.tags.contains('paradoxpower_portal_' + entity.uuid));
+            //todo: deducte energy from player for keeping the portals open
+
+            let portals = global.px.getPortals(entity.server, entity.uuid)
 
             portals.forEach(portal => {
                 portal.persistentData.putLong('paradoxpower_portal_duration', entity.level.time + global.px.portalLifeTime)
