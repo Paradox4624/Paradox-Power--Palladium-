@@ -138,13 +138,14 @@ StartupEvents.registry('palladium:abilities', (event) => {
                 let highOffset = 10; // vertical search distance above. allows a little more leeway for teleporting to the top of walls, cliffs etc, or through floors from below.
 
                 // Determine the maximum height for search based on if the dimension has a ceiling or not, in the event that the target location is near the world height limit.
-                //todo double check this, its not working in the nether
+                // dimension.logicalHeight() is the closest thing that will give a height limit for dims with ceilings. it is used to limit some effects (including chorus fruits teleports)
+                // custom dims can have ceilings and logicalHeight()s that dont match, but as this will only be for dims with cielings, im going to leave it in and hope the problem dims are few and far between.
                 let maxHeight;
                 let dimension = level.dimensionType();
                 if (dimension.hasCeiling() === true) {
-                    maxHeight = dimension.MAX_Y - 3;
+                    maxHeight = dimension.logicalHeight() - 3;
                 } else {
-                    maxHeight = dimension.MAX_Y;
+                    maxHeight = 2031;
                 }
                 highOffset = Math.min(maxHeight - centerPos.y, highOffset);
 
