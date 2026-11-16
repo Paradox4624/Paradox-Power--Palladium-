@@ -1,0 +1,17 @@
+{
+    "temperature": 0.8,
+    "downfall": 0,
+    "has_precipitation": false,
+    "category": "plains",
+    "creature_spawn_probability": 0,
+    "effects": {
+        "sky_color": 16777215,
+        "fog_color": 0,
+        "water_color": 4159204,
+        "water_fog_color": 0
+    },
+    "spawners": {},
+    "spawn_costs": {},
+    "carvers": {},
+    "features": []
+}

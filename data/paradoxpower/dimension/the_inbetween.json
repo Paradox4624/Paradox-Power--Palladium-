@@ -1,0 +1,11 @@
+{
+    "type": "paradoxpower:the_inbetween_type",
+    "generator": {
+        "type": "minecraft:flat",
+        "settings": {
+            "biome": "paradoxpower:the_inbetween_biome",
+            "layers": [],
+            "structure_overrides": []
+        }
+    }
+}
