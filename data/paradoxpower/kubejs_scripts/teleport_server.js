@@ -17,7 +17,7 @@ PlayerEvents.tick(event => {
     }
 });
 
-//temporary command to allow running code for debugging etc
+//temporary command for debugging
 ServerEvents.commandRegistry(event => {
     const { commands: Commands, arguments: Arguments } = event
     event.register(
@@ -25,8 +25,9 @@ ServerEvents.commandRegistry(event => {
             let player = ctx.source.player
             if (!player) return 0
 
-            player.persistentData.paradoxpower_visiteddims = []; //debug used while creating dimensions visited list
-            player.tell('Visited dimensions reset');
+            let level = player.level.dimensionType();
+            player.tell('level.logicalHeight():' + level.logicalHeight());
+            player.tell('level.minY():' + level.minY());
 
             return 1
         })
@@ -203,10 +204,11 @@ LevelEvents.tick(event => {
         //store the particle stagering variable to continue on next pass
         portal.persistentData.putLong('paradoxpower_portal_delay_step', particleDelayStep);
 
-        // Define a 2.8 x 2.8 x 2.8 collision box around the portal entity. bringing it in s little from the full 3 x 3 x 3 of the portal frame/trails
+        // Define a collision box using the 1.2425 radius sweet spot above the portal entity. bringing it in s little from the full 3 x 3 x 3 of the portal frame/trails
+        const sweetSpot = 1.2425
         let box = AABB.of(
-            portal.x - 1.4, portal.y + 0.1, portal.z - 1.4,
-            portal.x + 1.4, portal.y + 2.9, portal.z + 1.4
+            portal.x - sweetSpot, portal.y + 0.05, portal.z - sweetSpot,
+            portal.x + sweetSpot, portal.y + 2.95, portal.z + sweetSpot
         );
 
         let destX = portal.persistentData.getDouble('paradoxpower_destX')
@@ -269,3 +271,26 @@ LevelEvents.tick(event => {
         })
     })
 })
+
+
+
+//teleport falling entities in The Inbetween if they fall below minY
+LevelEvents.tick(event => {
+    const { level, server } = event;
+
+    if (level.time % 10 !== 0) return;
+    if (level.dimension.toString() !== 'paradoxpower:the_inbetween') return;
+
+    const overworld = server.getLevel('minecraft:overworld');
+    if (!overworld) return;
+    const targetY = overworld.dimensionType().logicalHeight();
+    const minY = level.dimensionType().minY();
+
+    // Get all loaded entities in the void dimension
+    level.entities.forEach(entity => {
+        if (entity.y >= minY) return;
+
+        // Teleport to Overworld at the same X and Z coordinates
+        entity.teleportTo(overworld, entity.x, targetY, entity.z, [], entity.yaw, entity.pitch);        
+    });
+});
