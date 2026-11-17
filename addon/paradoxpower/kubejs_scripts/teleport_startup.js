@@ -252,10 +252,10 @@ StartupEvents.registry('palladium:abilities', (event) => {
                 global.px.killPortal(portal);
             });
 
-            let destX = entity.persistentData.getDouble('paradoxpower_destX')
-            let destY = entity.persistentData.getDouble('paradoxpower_destY')
-            let destZ = entity.persistentData.getDouble('paradoxpower_destZ')
-            let destDim = entity.persistentData.getString('paradoxpower_destDim');
+            let destX = entity.persistentData.getDouble('paradoxpower_destX') || 0;
+            let destY = entity.persistentData.getDouble('paradoxpower_destY') || 64;
+            let destZ = entity.persistentData.getDouble('paradoxpower_destZ') || 0;
+            let destDim = entity.persistentData.getString('paradoxpower_destDim') || 'minecraft:overworld';
 
             const eyePos = entity.getEyePosition()
             const lookVec = entity.getLookAngle()
@@ -278,5 +278,66 @@ StartupEvents.registry('palladium:abilities', (event) => {
             portals.forEach(portal => {
                 portal.persistentData.putLong('paradoxpower_portal_duration', entity.level.time + global.px.portalLifeTime)
             });
+        })
+});
+
+StartupEvents.registry('block', event => {
+  event.create('paradoxpower:inbetween_cloud')
+    .displayName('Inbetween Cloud')
+    .textureAll('minecraft:block/white_stained_glass')
+    .soundType('stone')
+    .hardness(0.7)
+    .resistance(0.7)
+    .renderType('translucent')         // Enables semi-transparent rendering
+    .defaultTranslucent()              // Prevents adjacent blocks from X-raying and handles light passing through
+    .noDrops()      
+})
+
+StartupEvents.registry('palladium:abilities', (event) => {
+    event.create('paradoxpower:teleport_inbetween')
+        .icon(palladium.createItemIcon('minecraft:ender_pearl'))
+        .documentationDescription('Open a Portal to a target location, allowing for teleportation between the two locations.')
+
+        .addProperty('particle_red', 'float', 0.3, 'Red component of particle color')
+        .addProperty('particle_green', 'float', 0.3, 'Green component of particle color')
+        .addProperty('particle_blue', 'float', 0.3, 'Blue component of particle color')
+        .addProperty('particle_scale', 'float', 0.5, 'Particle scale')
+        .addProperty('particle_count', 'integer', 50, 'Particle amount')
+        .addProperty('sound', 'string', 'minecraft:entity.enderman.teleport', 'Sound effect')
+        .addProperty('sound_volume', 'float', 1.0, 'Sound volume')
+        .addProperty('sound_pitch', 'float', 1.0, 'Sound pitch')
+
+        .firstTick((entity, entry, holder, enabled) => {
+            if (!enabled) return; // Ability is not enabled, return early.
+
+            //if player is not in the inbetween
+
+                //get players current x,y,z coords
+
+                //adjust y coord to fit in the_inbetween's min/max y. maybe some random for when outside the range?
+
+                //check if destination has a safe teleport spot
+
+                //if not safe, try finding a safe spot in virtical core at x,z
+
+                //if still not safe, try to find safe spot in 50 (100?) radius of x,z
+
+                //if no safe sopt found, create small inbetween cloud to create a safe spot
+
+                //update last dim to permanent data
+
+                //teleport to safe spot
+
+            //if in the inbetween
+                
+                //get players current x,y,z coords
+
+                //adjust y coord to fit in last visited dim's min/max y.
+
+                //check if destination has a safe teleport spot
+
+                //if not safe, try to find safe spot in 50 (100?) radius of x,z
+
+                //if still not safe teleport to x,y,z and pray
         })
 });
