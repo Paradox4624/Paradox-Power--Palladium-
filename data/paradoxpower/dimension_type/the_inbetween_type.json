@@ -10,11 +10,11 @@
     "coordinate_scale": 1,
     "ambient_light": 0.17948718,
     "fixed_time": 8000,
-    "logical_height": 256,
+    "logical_height": 512,
     "effects": "minecraft:the_nether",
     "infiniburn": "#minecraft:infiniburn_overworld",
-    "min_y": 0,
-    "height": 256,
+    "min_y": -512,
+    "height": 1024,
     "monster_spawn_block_light_limit": 0,
     "monster_spawn_light_level": 0
 }
