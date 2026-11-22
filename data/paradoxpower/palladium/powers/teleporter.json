@@ -13,20 +13,14 @@
             "hidden": false,
             "hidden_in_bar": false,
             "list_index": 0,
-            "gui_position": [0, 0],
+            "gui_position": [
+                0,
+                0
+            ],
             "gui_frame_type": "task",
             "description": "Teleport to where you are looking.",
             "range": 500,
             "swap": true,
-            "particle_red": 0.5,
-            "particle_green": 0.2,
-            "particle_blue": 0.6,
-            "particle_scale": 0.6,
-            "particle_count": 100,
-            "particle_position": "both",
-            "sound": "minecraft:entity.enderman.teleport",
-            "sound_volume": 1,
-            "sound_pitch": 1,
             "conditions": {
                 "enabling": [
                     {
@@ -39,7 +33,7 @@
                 "unlocking": []
             }
         },
-        "Portal":{
+        "Portal": {
             "type": "paradoxpower:open_portal",
             "icon": "minecraft:ender_pearl",
             "title": "Open Portal",
@@ -47,7 +41,10 @@
             "hidden": false,
             "hidden_in_bar": false,
             "list_index": 2,
-            "gui_position": [0, 1],
+            "gui_position": [
+                0,
+                1
+            ],
             "gui_frame_type": "task",
             "description": "Open a portal to a target location.",
             "particle_red": 0.5,
@@ -70,25 +67,20 @@
                 "unlocking": []
             }
         },
-        "Imbetween":{
-            "type":"paradoxpower:teleport_inbetween",
+        "Inbetween": {
+            "type": "paradoxpower:teleport_inbetween",
             "icon": "minecraft:ender_pearl",
-            "title": "Teleport",
+            "title": "The Inbetween",
             "bar_color": "white",
             "hidden": false,
             "hidden_in_bar": false,
             "list_index": 3,
-            "gui_position": [0, 0],
+            "gui_position": [
+                0,
+                0
+            ],
             "gui_frame_type": "task",
-            "description": "Teleport to The Inbetween.",
-            "particle_red": 0.5,
-            "particle_green": 0.2,
-            "particle_blue": 0.6,
-            "particle_scale": 0.6,
-            "particle_count": 100,
-            "sound": "minecraft:entity.enderman.teleport",
-            "sound_volume": 1,
-            "sound_pitch": 1,
+            "description": "Teleport to/from The Inbetween.",
             "conditions": {
                 "enabling": [
                     {
@@ -98,7 +90,172 @@
                         "needs_empty_hand": false
                     }
                 ],
-                "unlocking": []
+                "unlocking": [
+                    {
+                        "type": "palladium:or",
+                        "conditions": [
+                            {
+                                "type": "palladium:and",
+                                "conditions": [
+                                    {
+                                        "type": "palladium:dimension",
+                                        "dimension": "paradoxpower:the_inbetween"
+                                    },
+                                    {
+                                        "type": "palladium:crouching"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "palladium:not",
+                                "conditions": [
+                                    {
+                                        "type": "palladium:dimension",
+                                        "dimension": "paradoxpower:the_inbetween"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        "Inbetween_Pinch_Fabric": {
+            "type": "paradoxpower:pinch_fabric",
+            "icon": "minecraft:white_stained_glass",
+            "title": "Pinch Fabric",
+            "bar_color": "white",
+            "hidden": false,
+            "hidden_in_bar": false,
+            "list_index": 3,
+            "gui_position": [
+                0,
+                0
+            ],
+            "gui_frame_type": "task",
+            "description": "Pinch the fabric of The Inbetween.",
+            "conditions": {
+                "enabling": [
+                    {
+                        "type": "palladium:action",
+                        "cooldown": 40,
+                        "key_type": "key_bind",
+                        "needs_empty_hand": false
+                    }
+                ],
+                "unlocking": [
+                    {
+                        "type": "palladium:dimension",
+                        "dimension": "paradoxpower:the_inbetween"
+                    },
+                    {
+                        "type": "palladium:not",
+                        "conditions": [
+                            {
+                                "type": "palladium:crouching"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        "Inbetween_Flight_Speed": {
+            "type": "palladium:attribute_modifier",
+            "attribute": "palladium:flight_speed",
+            "icon": "minecraft:iron_chestplate",
+            "title": "null",
+            "bar_color": "light_gray",
+            "hidden": true,
+            "hidden_in_bar": true,
+            "list_index": -1,
+            "gui_position": "null",
+            "gui_frame_type": "task",
+            "description": "null",
+            "amount": 0.7,
+            "operation": 0,
+            "uuid": "null",
+            "conditions": {
+                "enabling": [],
+                "unlocking": [
+                    {
+                        "type": "palladium:dimension",
+                        "dimension": "paradoxpower:the_inbetween"
+                    }
+                ]
+            }
+        },
+        "Inbetween_Flight_Flexibility": {
+            "type": "palladium:attribute_modifier",
+            "attribute": "palladium:flight_flexibility",
+            "icon": "minecraft:iron_chestplate",
+            "title": "null",
+            "bar_color": "light_gray",
+            "hidden": true,
+            "hidden_in_bar": true,
+            "list_index": -1,
+            "gui_position": "null",
+            "gui_frame_type": "task",
+            "description": "null",
+            "amount": 1,
+            "operation": 0,
+            "uuid": "null",
+            "conditions": {
+                "enabling": [],
+                "unlocking": [
+                    {
+                        "type": "palladium:dimension",
+                        "dimension": "paradoxpower:the_inbetween"
+                    }
+                ]
+            }
+        },   
+        "Inbetween_Flight_Sprint_Speed": {
+            "type": "palladium:attribute_modifier",
+            "attribute": "palladium:flight_sprint_speed",
+            "icon": "minecraft:iron_chestplate",
+            "title": "null",
+            "bar_color": "light_gray",
+            "hidden": true,
+            "hidden_in_bar": true,
+            "list_index": -1,
+            "gui_position": "null",
+            "gui_frame_type": "task",
+            "description": "null",
+            "amount": 1,
+            "operation": 0,
+            "uuid": "null",
+            "conditions": {
+                "enabling": [],
+                "unlocking": [
+                    {
+                        "type": "palladium:dimension",
+                        "dimension": "paradoxpower:the_inbetween"
+                    }
+                ]
+            }
+        },                  
+        "Inbetween_Fall_Immunity": {
+            "type": "palladium:damage_immunity",
+            "icon": "minecraft:potion",
+            "title": "null",
+            "bar_color": "light_gray",
+            "hidden": true,
+            "hidden_in_bar": true,
+            "list_index": -1,
+            "gui_position": "null",
+            "gui_frame_type": "task",
+            "description": "null",
+            "damage_sources": [
+                "minecraft:is_fall"
+            ],
+            "conditions": {
+                "enabling": [],
+                "unlocking": [
+                    {
+                        "type": "palladium:dimension",
+                        "dimension": "paradoxpower:the_inbetween"
+                    }
+                ]
             }
         }
     }
