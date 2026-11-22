@@ -1,9 +1,10 @@
+const FlightHandler = Java.loadClass('net.threetag.palladium.entity.FlightHandler');
+
 const ForgeChunkManager = Java.loadClass('net.minecraftforge.common.world.ForgeChunkManager')
 
 if (!global.px) { global.px = {} };
 
 global.px.portalLifeTime = 40; //how long portals will stay open after the player has stopped powering them, in ticks
-
 
 //register chunks to be force loaded by entity
 global.px.setEntityChunkForced = function (entityOwner, forceChunkLoad) {
@@ -22,6 +23,52 @@ global.px.setEntityChunkForced = function (entityOwner, forceChunkLoad) {
     )
 };
 
+//check if target block is a good destination for a teleport. 
+//this check asumes the calling entity is a standerd 2 block high by 1 block wide, so may have problems with oversized entites.
+global.px.checkClear = function (level, checkPos) {
+    return (level.getBlockState(checkPos).blocksMotion() && !level.getBlockState(checkPos.above(1)).blocksMotion() && !level.getBlockState(checkPos.above(2)).blocksMotion());
+}
+
+//get a safe spot near the target block if the target block is not a good destination for the teleport.
+global.px.findSafeSpotNear = function (level, centerPos) {
+
+    if (global.px.checkClear(level, centerPos)) return centerPos;
+
+    const baseOffset = 2; // horizontal search radius
+    let highOffset = 10; // vertical search distance above. allows a little more leeway for teleporting to the top of walls, cliffs etc, or through floors from below.
+
+    // Determine the maximum height for search based on if the dimension has a ceiling or not, in the event that the target location is near the world height limit.
+    // dimension.logicalHeight() is the closest thing that will give a height limit for dims with ceilings. it is used to limit some effects (including chorus fruits teleports)
+    // custom dims can have ceilings and logicalHeight()s that dont match, but as this will only be for dims with cielings, im going to leave it in and hope the problem dims are few and far between.
+    let maxHeight;
+    let dimension = level.dimensionType();
+    if (dimension.hasCeiling() === true) {
+        maxHeight = dimension.logicalHeight() - 3;
+    } else {
+        maxHeight = 2031;
+    }
+    highOffset = Math.min(maxHeight - centerPos.y, highOffset);
+
+    let bestPos = null;
+    let closestDistSq = Infinity;
+
+    // step through the rectangular search area for the closest safe spot to the center position. this will unfortunately bias the selection towards the -x, -y, -z corner of the search area.
+    for (let x = -baseOffset; x <= baseOffset; x++) {
+        for (let y = -baseOffset; y <= highOffset; y++) {
+            for (let z = -baseOffset; z <= baseOffset; z++) {
+                let checkPos = centerPos.offset(x, y, z);
+                if (global.px.checkClear(level, checkPos)) {
+                    let distSq = centerPos.distSqr(checkPos);
+                    if (distSq < closestDistSq) {
+                        closestDistSq = distSq;
+                        bestPos = checkPos;
+                    }
+                }
+            }
+        }
+    }
+    return bestPos;
+}
 
 //create linked portals and mark them as belonging to the player
 global.px.createPortalPair = function (entity, posA, posB) {
@@ -84,6 +131,34 @@ global.px.killPortal = function (portal) {
     portal.kill();
 }
 
+global.px.teleportTo = function (entity, sourceBlock, sourceDim, destBlock, destDim, particleYOffset) {
+
+    const blockCenteringOffset = 0.5;
+    const blockYOffset = 1;
+
+    entity.teleportTo(destDim, destBlock.x + blockCenteringOffset, destBlock.y + blockYOffset, destBlock.z + blockCenteringOffset, [], entity.yaw, entity.pitch)
+
+    //spawn paricles are source and destination
+    sourceDim.spawnParticles('minecraft:dust 0.6 0.3 0.9 0.5', true,
+        sourceBlock.x + blockCenteringOffset,
+        sourceBlock.y + blockYOffset + particleYOffset,
+        sourceBlock.z + blockCenteringOffset,
+        0.5, 0.5, 0.5, 100, 1
+    );
+    destDim.spawnParticles('minecraft:dust 0.6 0.3 0.9 0.5', true,
+        destBlock.x + blockCenteringOffset,
+        destBlock.y + blockYOffset + particleYOffset,
+        destBlock.z + blockCenteringOffset,
+        0.5, 0.5, 0.5, 100, 1
+    );
+
+    //delay sound so it play right for players that are the teleported entity
+    entity.server.scheduleInTicks(5, () => {
+        sourceDim.playSound(null, sourceBlock.x + blockCenteringOffset, sourceBlock.y + blockYOffset, sourceBlock.z + blockCenteringOffset, 'minecraft:entity.enderman.teleport', 'neutral', 1.0, 1.0)
+        destDim.playSound(null, destBlock.x + blockCenteringOffset, destBlock.y + blockYOffset, destBlock.z + blockCenteringOffset, 'minecraft:entity.enderman.teleport', 'neutral', 1.0, 1.0)
+    });
+
+}
 
 StartupEvents.registry('palladium:abilities', (event) => {
     event.create('paradoxpower:teleport_ray')
@@ -92,30 +167,10 @@ StartupEvents.registry('palladium:abilities', (event) => {
 
         .addProperty('range', 'float', 20, 'Max range of the teleport')
         .addProperty('swap', 'boolean', false, 'Swap with targetted entity')
-        .addProperty('particle_red', 'float', 0.3, 'Red component of particle color')
-        .addProperty('particle_green', 'float', 0.3, 'Green component of particle color')
-        .addProperty('particle_blue', 'float', 0.3, 'Blue component of particle color')
-        .addProperty('particle_scale', 'float', 0.5, 'Particle scale')
-        .addProperty('particle_count', 'integer', 50, 'Particle amount')
-        .addProperty('particle_position', 'string', 'both', 'Where to show particals. options: destination, source, both, neither')
-        .addProperty('sound', 'string', 'minecraft:entity.enderman.teleport', 'Sound effect')
-        .addProperty('sound_volume', 'float', 1.0, 'Sound volume')
-        .addProperty('sound_pitch', 'float', 1.0, 'Sound pitch')
 
         .firstTick((entity, entry, holder, enabled) => {
             if (!enabled) return; // Ability is not enabled, return early.
-            const yOffset = 1.0;
-            const blockCenteringOffset = 0.5;
             let range = entry.getPropertyByName('range');
-            const particleRed = entry.getPropertyByName('particle_red');
-            const particleGreen = entry.getPropertyByName('particle_green');
-            const particleBlue = entry.getPropertyByName('particle_blue');
-            const particleScale = entry.getPropertyByName('particle_scale');
-            const particleCount = entry.getPropertyByName('particle_count');
-            const particlePosition = entry.getPropertyByName('particle_position');
-            const sound = entry.getPropertyByName('sound');
-            const volume = entry.getPropertyByName('sound_volume');
-            const pitch = entry.getPropertyByName('sound_pitch');
             let swap = entry.getPropertyByName('swap');
 
             //reduce range to simulation distance if it exceeds it
@@ -125,50 +180,6 @@ StartupEvents.registry('palladium:abilities', (event) => {
             //cast the ray and try to get a hit. will go through liquids, but not through non solid blocks like grass.
             const hit = entity.rayTrace(range, false);
             if (!hit) return;
-
-            //check if target block is a good destination for the teleport. 
-            //this check asumes the calling entity is a standerd 2 block high by 1 block wide, so may have problems with oversized entites.
-            function checkClear(level, checkPos) {
-                return (level.getBlockState(checkPos).blocksMotion() && !level.getBlockState(checkPos.above(1)).blocksMotion() && !level.getBlockState(checkPos.above(2)).blocksMotion());
-            }
-
-            //get a safe spot near the target block if the target block is not a good destination for the teleport.
-            function findSafeSpotNear(level, centerPos) {
-                const baseOffset = 2; // horizontal search radius
-                let highOffset = 10; // vertical search distance above. allows a little more leeway for teleporting to the top of walls, cliffs etc, or through floors from below.
-
-                // Determine the maximum height for search based on if the dimension has a ceiling or not, in the event that the target location is near the world height limit.
-                // dimension.logicalHeight() is the closest thing that will give a height limit for dims with ceilings. it is used to limit some effects (including chorus fruits teleports)
-                // custom dims can have ceilings and logicalHeight()s that dont match, but as this will only be for dims with cielings, im going to leave it in and hope the problem dims are few and far between.
-                let maxHeight;
-                let dimension = level.dimensionType();
-                if (dimension.hasCeiling() === true) {
-                    maxHeight = dimension.logicalHeight() - 3;
-                } else {
-                    maxHeight = 2031;
-                }
-                highOffset = Math.min(maxHeight - centerPos.y, highOffset);
-
-                let bestPos = null;
-                let closestDistSq = Infinity;
-
-                // step through the rectangular search area for the closest safe spot to the center position. this will unfortunately bias the selection towards the -x, -y, -z corner of the search area.
-                for (let x = -baseOffset; x <= baseOffset; x++) {
-                    for (let y = -baseOffset; y <= highOffset; y++) {
-                        for (let z = -baseOffset; z <= baseOffset; z++) {
-                            let checkPos = centerPos.offset(x, y, z);
-                            if (checkClear(level, checkPos)) {
-                                let distSq = centerPos.distSqr(checkPos);
-                                if (distSq < closestDistSq) {
-                                    closestDistSq = distSq;
-                                    bestPos = checkPos;
-                                }
-                            }
-                        }
-                    }
-                }
-                return bestPos;
-            }
 
             //get destination as block, even if target is an entity.
             let destBlock;
@@ -182,48 +193,15 @@ StartupEvents.registry('palladium:abilities', (event) => {
             }
 
             //check destination block is clear, if not find a safe spot near it, if possible. if not possible, do nothing.
-            if (!checkClear(entity.level, destBlock)) {
-                destBlock = findSafeSpotNear(entity.level, destBlock);
-            }
+            destBlock = global.px.findSafeSpotNear(entity.level, destBlock);
             if (!destBlock) return;
-
-            //get source and destination coordinates, with offsets to center the destination on the center-top of the block.
-            const sourceX = entity.x;
-            const sourceY = entity.y;
-            const sourceZ = entity.z;
-            const destinationX = destBlock.x + blockCenteringOffset;
-            const destinationY = destBlock.y + yOffset;
-            const destinationZ = destBlock.z + blockCenteringOffset;
-
-            //show particles and play sound at source location. delay the sound slightly to make sure it plays correctly.
-            if (particlePosition === 'source' || particlePosition === 'both') {
-                entity.server.runCommandSilent(
-                    `particle minecraft:dust ${particleRed} ${particleGreen} ${particleBlue} ${particleScale} ${sourceX} ${sourceY + 1} ${sourceZ} 0.5 0.5 0.5 0 ${particleCount} force`
-                );
-            }
-            entity.server.scheduleInTicks(5, () => {
-                entity.server.runCommandSilent(
-                    `playsound ${sound} master @a ${sourceX} ${sourceY} ${sourceZ} ${volume} ${pitch}`
-                );
-            });
 
             //teleport the calling entity to the destination block and if swap is true, teleport the targeted entity to the source block.
             if (swap === true) {
-                hit.entity.teleportTo(sourceX, sourceY, sourceZ);
+                hit.entity.teleportTo(entity.x, entity.y, entity.z);
             }
-            entity.teleportTo(destinationX, destinationY, destinationZ);
+            global.px.teleportTo(entity, entity.blockPosition().below(), entity.level, destBlock, entity.level, 1)
 
-            //show particles and play sound at destination location. delay the sound slightly to make sure it plays correctly.
-            if (particlePosition === 'destination' || particlePosition === 'both') {
-                entity.server.runCommandSilent(
-                    `particle minecraft:dust ${particleRed} ${particleGreen} ${particleBlue} ${particleScale} ${destinationX} ${destinationY + 1} ${destinationZ} 0.5 0.5 0.5 0 ${particleCount} force`
-                );
-            }
-            entity.server.scheduleInTicks(5, () => {
-                entity.server.runCommandSilent(
-                    `playsound ${sound} master @a ${destinationX} ${destinationY} ${destinationZ} ${volume} ${pitch}`
-                );
-            });
         });
 });
 
@@ -282,62 +260,90 @@ StartupEvents.registry('palladium:abilities', (event) => {
 });
 
 StartupEvents.registry('block', event => {
-  event.create('paradoxpower:inbetween_cloud')
-    .displayName('Inbetween Cloud')
-    .textureAll('minecraft:block/white_stained_glass')
-    .soundType('stone')
-    .hardness(0.7)
-    .resistance(0.7)
-    .renderType('translucent')         // Enables semi-transparent rendering
-    .defaultTranslucent()              // Prevents adjacent blocks from X-raying and handles light passing through
-    .noDrops()      
+    event.create('paradoxpower:inbetween_pinch')
+        .displayName('Fabric of The Inbetween')
+        .textureAll('minecraft:block/white_stained_glass')
+        .stoneSoundType()
+        .hardness(0.3)
+        .resistance(10)
+        .defaultTranslucent()
+        .noValidSpawns(true)
+        .suffocating(false)
+        .noDrops()
 })
 
 StartupEvents.registry('palladium:abilities', (event) => {
     event.create('paradoxpower:teleport_inbetween')
         .icon(palladium.createItemIcon('minecraft:ender_pearl'))
-        .documentationDescription('Open a Portal to a target location, allowing for teleportation between the two locations.')
+        .documentationDescription('Teleport to/from The Inbetween."')
 
-        .addProperty('particle_red', 'float', 0.3, 'Red component of particle color')
-        .addProperty('particle_green', 'float', 0.3, 'Green component of particle color')
-        .addProperty('particle_blue', 'float', 0.3, 'Blue component of particle color')
-        .addProperty('particle_scale', 'float', 0.5, 'Particle scale')
-        .addProperty('particle_count', 'integer', 50, 'Particle amount')
-        .addProperty('sound', 'string', 'minecraft:entity.enderman.teleport', 'Sound effect')
-        .addProperty('sound_volume', 'float', 1.0, 'Sound volume')
-        .addProperty('sound_pitch', 'float', 1.0, 'Sound pitch')
+        .addProperty('value', 'float', 0.0, 'paramater')
 
         .firstTick((entity, entry, holder, enabled) => {
             if (!enabled) return; // Ability is not enabled, return early.
 
-            //if player is not in the inbetween
+            let level = entity.level;
+            let sourceDim = level.dimension;
+            let server = entity.server;
 
-                //get players current x,y,z coords
+            if (sourceDim.toString() !== 'paradoxpower:the_inbetween') {
 
-                //adjust y coord to fit in the_inbetween's min/max y. maybe some random for when outside the range?
+                let destDim = server.getLevel('paradoxpower:the_inbetween');
 
-                //check if destination has a safe teleport spot
+                //update last visited dim to persistentData
+                entity.persistentData.putString('paradoxpower_lastvisiteddim', sourceDim.toString())
 
-                //if not safe, try finding a safe spot in virtical core at x,z
+                //teleport and put the player in creative flight to stop them moving/falling before they are loaded at their end
+                global.px.teleportTo(entity, entity.blockPosition().below(), entity.level, entity.blockPosition().below(), destDim, 1)
+                entity.setMotion(0, 0, 0);
+                entity.hurtMarked = true
+                entity.abilities.mayfly = true;
+                entity.abilities.flying = true;
+                entity.onUpdateAbilities()
 
-                //if still not safe, try to find safe spot in 50 (100?) radius of x,z
+                //schedule flight type change and client sync for the next tick, to make sure teleport and creative flight are active
+                server.scheduleInTicks(1, () => {
+                    let flightHandler = entity.palladium$getFlightHandler();
+                    flightHandler.setFlightType(FlightHandler.FlightType.NORMAL);
+                    entity.sendData('paradoxpower_enable_Flight', {});
+                });
 
-                //if no safe sopt found, create small inbetween cloud to create a safe spot
+            } else {
 
-                //update last dim to permanent data
+                let destDim = server.getLevel(entity.persistentData.getString("paradoxpower_lastvisiteddim"));
 
-                //teleport to safe spot
+                global.px.teleportTo(entity, entity.blockPosition().below(), entity.level, entity.blockPosition().below(), destDim, 1)
 
-            //if in the inbetween
-                
-                //get players current x,y,z coords
+            }
+        })
+});
 
-                //adjust y coord to fit in last visited dim's min/max y.
+StartupEvents.registry('palladium:abilities', (event) => {
+    event.create('paradoxpower:pinch_fabric')
+        .icon(palladium.createItemIcon('minecraft:ender_pearl'))
+        .documentationDescription('Pinch the fabric of The Inbetween.')
 
-                //check if destination has a safe teleport spot
+        .addProperty('value', 'float', 0.0, 'paramater')
 
-                //if not safe, try to find safe spot in 50 (100?) radius of x,z
+        .firstTick((entity, entry, holder, enabled) => {
+            if (!enabled) return; // Ability is not enabled, return early.
 
-                //if still not safe teleport to x,y,z and pray
+            let level = entity.level;
+            if (!level) return;
+            let targetStartPos = entity.blockPosition().below();
+            if (!targetStartPos) return;
+            let targetNewBlock = new Block.getBlock('paradoxpower:inbetween_pinch').defaultBlockState();
+            if (!targetNewBlock) return;
+            for (let x = targetStartPos.x - 1; x <= targetStartPos.x + 1; x++) {
+                for (let z = targetStartPos.z - 1; z <= targetStartPos.z + 1; z++) {
+                    let targetPos = new BlockPos(x, targetStartPos.y, z);
+                    if (!targetPos) continue;
+                    let targetBlockState = level.getBlockState(targetPos);
+                    if (!targetBlockState) continue;
+                    if (targetBlockState.isAir()) {
+                        level.setBlock(targetPos, targetNewBlock, 3);
+                    }
+                }
+            }
         })
 });
