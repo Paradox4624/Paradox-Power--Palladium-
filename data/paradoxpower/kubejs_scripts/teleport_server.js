@@ -1,3 +1,4 @@
+const FlightHandler = Java.loadClass('net.threetag.palladium.entity.FlightHandler');
 
 //every 2 seconds, check the players current dimension and if not already listed, add the dimension to the list of visited dimensions.
 //also record the dimension as the last visited dimension if it isnt paradoxpower:the_inbetween
@@ -6,8 +7,8 @@ PlayerEvents.tick(event => {
         let visited = event.player.persistentData.paradoxpower_visiteddims || [];
         let dim = event.player.level.dimension.toString();
 
-        if (dim !== 'paradoxpower:the_inbetween'){
-            event.player.persistentData.paradoxpower_lastvisiteddim = dim;
+        if (dim !== 'paradoxpower:the_inbetween') {
+            event.player.persistentData.putString("paradoxpower_lastvisiteddim", dim);
         }
 
         let found = visited.find(tag => {
@@ -31,19 +32,39 @@ ServerEvents.commandRegistry(event => {
             let player = ctx.source.player
             if (!player) return 0
 
+
             let level = player.level;
             let levelType = level.dimensionType();
             player.tell('levelType.logicalHeight():' + levelType.logicalHeight());
+            player.tell('levelType.height():' + levelType.height());
             player.tell('levelType.minY():' + levelType.minY());
 
-            player.tell('level.dimension.toString():' + level.dimension.toString());
-            if (level.dimension.toString() == "paradoxpower:the_inbetween") {
-                player.tell('getting block below...');
-                let centerpos = player.blockPosition().below();
-                player.tell('changeing block to inbetween_cloud...');
-                //level.setBlock(centerpos, Block.getBlock('minecraft:glass').defaultBlockState(), 3);
-                level.getBlock(centerpos).set('paradoxpower:inbetween_cloud')
+            let flightHandler = player.palladium$getFlightHandler();
+            player.tell('flightHandler.getFlightType():' + flightHandler.getFlightType());
+            flightHandler.setFlightType(FlightHandler.FlightType.NORMAL);
+            player.tell('flightHandler.getFlightType():' + flightHandler.getFlightType());
+            player.tell('flightHandler.getPhase():' + flightHandler.getPhase());
+
+            server.scheduleInTicks(1, () => {
+                player.sendData('paradoxpower_enable_Flight', {});
+            });
+
+
+            /*
+            player.tell('start flightHandler.getFlightType():' + flightHandler.getFlightType())
+            //player.tell('flightHandler.FlightType.NONE:' + flightHandler.FlightType.NONE);
+            if (flightHandler.getFlightType() == FlightHandler.FlightType.NONE) {
+                player.tell('flightHandler.getFlightType() == FlightHandler.FlightType.NONE');
+                SyncFlightStateMessage(player.getId(), true).sendToTracking(player);
+                flightHandler.setFlightType(flightHandler.getAvailableFlightType(player))
+            } else {
+                player.tell('flightHandler.getFlightType() == FlightHandler.FlightType.NORMAL');
+                SyncFlightStateMessage(player.getId(), false).sendToTracking(player);
+                flightHandler.setFlightType(FlightHandler.FlightType.NONE)
             }
+            player.tell('end flightHandler.getFlightType():' + flightHandler.getFlightType())
+
+            */
 
             return 1
         })
@@ -243,9 +264,10 @@ LevelEvents.tick(event => {
         let destX = portal.persistentData.getDouble('paradoxpower_destX')
         let destY = portal.persistentData.getDouble('paradoxpower_destY')
         let destZ = portal.persistentData.getDouble('paradoxpower_destZ')
+        let destBlock = BlockPos(destX, destY, destZ).below();
         let destDim = portal.server.getLevel(portal.persistentData.getString('paradoxpower_destDim'))
 
-        if (!destDim) return;        
+        if (!destDim) return;
 
         // variables for the push/pull when entering/leaving the portals
         let motionSpeed = 1.0;
@@ -271,28 +293,12 @@ LevelEvents.tick(event => {
             if (target.type == 'minecraft:player') target.potionEffects.add('minecraft:blindness', 20, 0, false, false) // blindness adds a little something to being ported.
 
             //schedule the teleport to allow the pull to playout
-            //also spawn teleport particles inside the portals as the entity teleports
             target.server.scheduleInTicks(5, () => {
-                target.teleportTo(destDim, destX, destY, destZ, [], target.yaw, target.pitch)
-                level.spawnParticles('minecraft:dust 0.6 0.3 0.9 0.5', true,
-                    portal.x,
-                    portal.y + 1.5,
-                    portal.z,
-                    0.5, 0.5, 0.5, 100, 1
-                );
-                destDim.spawnParticles('minecraft:dust 0.6 0.3 0.9 0.5', true,
-                    destX,
-                    destY + 1.5,
-                    destZ,
-                    0.5, 0.5, 0.5, 100, 1
-                );
+                global.px.teleportTo(target, portal.blockPosition().below(), portal.level, destBlock, destDim, 1.5)
             });
 
             //schedule the push to happen the tick after the teleport completes
-            //also play sound here, so that sounds dont clip off for players when teleporting
             target.server.scheduleInTicks(6, () => {
-                level.playSound(null, portal.x, portal.y, portal.z, 'minecraft:entity.enderman.teleport', 'neutral', 1.0, 1.0)
-                destDim.playSound(null, destX, destY, destZ, 'minecraft:entity.enderman.teleport', 'neutral', 1.0, 1.0)
                 target.setMotion(motionX, 0, motionZ); //push out of portal
                 target.hurtMarked = true; // Ensures velocity updates properly on the client/server for some entities
             });
@@ -320,6 +326,6 @@ LevelEvents.tick(event => {
         if (entity.y >= minY) return;
 
         // Teleport to Overworld at the same X and Z coordinates
-        entity.teleportTo(overworld, entity.x, targetY, entity.z, [], entity.yaw, entity.pitch);
+        global.px.teleportTo(entity, entity.blockPosition().below(), entity.level, BlockPos(entity.x, targetY, entity.z), overworld, 1)
     });
 });
