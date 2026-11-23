@@ -297,14 +297,11 @@ StartupEvents.registry('palladium:abilities', (event) => {
                 global.px.teleportTo(entity, entity.blockPosition().below(), entity.level, entity.blockPosition().below(), destDim, 1)
                 entity.setMotion(0, 0, 0);
                 entity.hurtMarked = true
-                entity.abilities.mayfly = true;
                 entity.abilities.flying = true;
                 entity.onUpdateAbilities()
 
                 //schedule flight type change and client sync for the next tick, to make sure teleport and creative flight are active
                 server.scheduleInTicks(1, () => {
-                    let flightHandler = entity.palladium$getFlightHandler();
-                    flightHandler.setFlightType(FlightHandler.FlightType.NORMAL);
                     entity.sendData('paradoxpower_enable_Flight', {});
                 });
 
