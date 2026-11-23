@@ -32,39 +32,19 @@ ServerEvents.commandRegistry(event => {
             let player = ctx.source.player
             if (!player) return 0
 
-
             let level = player.level;
             let levelType = level.dimensionType();
-            player.tell('levelType.logicalHeight():' + levelType.logicalHeight());
-            player.tell('levelType.height():' + levelType.height());
-            player.tell('levelType.minY():' + levelType.minY());
-
             let flightHandler = player.palladium$getFlightHandler();
-            player.tell('flightHandler.getFlightType():' + flightHandler.getFlightType());
-            flightHandler.setFlightType(FlightHandler.FlightType.NORMAL);
-            player.tell('flightHandler.getFlightType():' + flightHandler.getFlightType());
+
+            player.tell('S---')
+            player.tell('FlightHandler.getAvailableFlightType(player):' + FlightHandler.getAvailableFlightType(player));
             player.tell('flightHandler.getPhase():' + flightHandler.getPhase());
+            player.tell('player.deltaMovement :' + player.deltaMovement);
+            player.tell('flightHandler.getPrevMovementDelta():' + flightHandler.getPrevMovementDelta());
+            player.tell('flightHandler.getAnimationState():' + flightHandler.getAnimationState());
 
-            server.scheduleInTicks(1, () => {
-                player.sendData('paradoxpower_enable_Flight', {});
-            });
 
-
-            /*
-            player.tell('start flightHandler.getFlightType():' + flightHandler.getFlightType())
-            //player.tell('flightHandler.FlightType.NONE:' + flightHandler.FlightType.NONE);
-            if (flightHandler.getFlightType() == FlightHandler.FlightType.NONE) {
-                player.tell('flightHandler.getFlightType() == FlightHandler.FlightType.NONE');
-                SyncFlightStateMessage(player.getId(), true).sendToTracking(player);
-                flightHandler.setFlightType(flightHandler.getAvailableFlightType(player))
-            } else {
-                player.tell('flightHandler.getFlightType() == FlightHandler.FlightType.NORMAL');
-                SyncFlightStateMessage(player.getId(), false).sendToTracking(player);
-                flightHandler.setFlightType(FlightHandler.FlightType.NONE)
-            }
-            player.tell('end flightHandler.getFlightType():' + flightHandler.getFlightType())
-
-            */
+            player.sendData('paradoxpower_debug_check', {});
 
             return 1
         })
